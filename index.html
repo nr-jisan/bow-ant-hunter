@@ -1,17 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Charger Bow Hunter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charger Bow 3D</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<canvas id="gameCanvas"></canvas>
+<div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
 
-<div id="gameOver">
-    <h1>GAME OVER</h1>
-    <button onclick="restartGame()">Restart</button>
+    <div id="ui">
+        <div id="score">Score: 0</div>
+        <div id="chargingRing"></div>
+    </div>
+
+    <div id="gameOverScreen">
+        <div class="modal">
+            <h1>GAME OVER</h1>
+            <p id="finalScore"></p>
+            <button onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
 </div>
 
 <script src="script.js"></script>
