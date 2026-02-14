@@ -13,78 +13,117 @@ arrowImg.src = "arrow.png";
 let antImg = new Image();
 antImg.src = "ant.png";
 
-let score = 0;
-let ants = [];
 let arrows = [];
-let gameOver = false;
+let ants = [];
+let score = 0;
 let angle = 0;
+let gameOver = false;
+let charging = false;
 
-/* =======================
-   GYROSCOPE AIMING
-======================= */
+/* =========================
+   GYROSCOPE AIM
+========================= */
 
-window.addEventListener("deviceorientation", (event) => {
+window.addEventListener("deviceorientation", (event)=>{
     if(event.gamma !== null){
         angle = event.gamma;
     }
 });
 
-/* =======================
-   SHOOT ON TOUCH
-======================= */
+/* =========================
+   CHARGER DETECTION
+========================= */
 
-document.addEventListener("touchstart", () => {
+if(navigator.getBattery){
+    navigator.getBattery().then(function(battery){
+
+        function updateCharging(){
+            if(battery.charging){
+                charging = true;
+                console.log("Charging...");
+            } else {
+                if(charging){
+                    shootArrow();
+                }
+                charging = false;
+            }
+        }
+
+        updateCharging();
+        battery.addEventListener("chargingchange", updateCharging);
+    });
+}
+
+/* =========================
+   SHOOT FUNCTION
+========================= */
+
+function shootArrow(){
+
     if(gameOver) return;
 
     arrows.push({
         x: canvas.width/2,
-        y: canvas.height - 120,
+        y: canvas.height - 180,
         angle: angle
-    });
-});
-
-/* =======================
-   SPAWN ANTS
-======================= */
-
-function spawnAnt(){
-    ants.push({
-        x: Math.random() * (canvas.width - 40),
-        y: -40,
-        speed: 2 + score * 0.1
     });
 }
 
-setInterval(spawnAnt, 1500);
+/* =========================
+   SPAWN ANTS SYSTEM
+========================= */
 
-/* =======================
-   UPDATE GAME
-======================= */
+let spawnRate = 2000; // start slow
+let antCount = 1;
 
-function update(){
+function spawnAnts(){
+
+    for(let i=0;i<antCount;i++){
+        ants.push({
+            x: Math.random()*(canvas.width-120),
+            y: -120,
+            speed: 1 + score*0.05
+        });
+    }
+}
+
+setInterval(spawnAnts, spawnRate);
+
+/* Increase difficulty */
+setInterval(()=>{
+    if(score > 5) antCount = 2;
+    if(score > 15) antCount = 3;
+}, 3000);
+
+/* =========================
+   GAME LOOP
+========================= */
+
+function gameLoop(){
 
     if(gameOver) return;
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Draw bow
+    /* DRAW BOW (BIG) */
     ctx.save();
-    ctx.translate(canvas.width/2, canvas.height - 100);
-    ctx.rotate(angle * Math.PI/180);
-    ctx.drawImage(bowImg, -40, -80, 80, 160);
+    ctx.translate(canvas.width/2, canvas.height-150);
+    ctx.rotate(angle*Math.PI/180);
+    ctx.drawImage(bowImg, -120, -200, 240, 400); // BIG SIZE
     ctx.restore();
 
-    // Draw arrows
-    arrows.forEach((arrow, index) => {
-        let rad = arrow.angle * Math.PI/180;
+    /* DRAW ARROWS (BIG) */
+    arrows.forEach((arrow,index)=>{
 
-        arrow.x += Math.sin(rad) * 8;
-        arrow.y -= Math.cos(rad) * 8;
+        let rad = arrow.angle*Math.PI/180;
+
+        arrow.x += Math.sin(rad)*10;
+        arrow.y -= Math.cos(rad)*10;
 
         ctx.save();
-        ctx.translate(arrow.x, arrow.y);
+        ctx.translate(arrow.x,arrow.y);
         ctx.rotate(rad);
-        ctx.drawImage(arrowImg, -10, -40, 20, 80);
+        ctx.drawImage(arrowImg, -40,-120,80,240); // BIG ARROW
         ctx.restore();
 
         if(arrow.y < 0){
@@ -92,26 +131,26 @@ function update(){
         }
     });
 
-    // Draw ants
-    ants.forEach((ant, aIndex) => {
+    /* DRAW ANTS (BIG) */
+    ants.forEach((ant,aIndex)=>{
 
         ant.y += ant.speed;
 
-        ctx.drawImage(antImg, ant.x, ant.y, 40, 40);
+        ctx.drawImage(antImg, ant.x, ant.y, 120, 120); // BIG ANT
 
-        // Game Over condition
-        if(ant.y > canvas.height - 40){
+        /* GAME OVER */
+        if(ant.y > canvas.height-120){
             gameOver = true;
-            document.getElementById("gameOver").style.display = "block";
+            document.getElementById("gameOver").style.display="block";
         }
 
-        // Collision check
-        arrows.forEach((arrow, rIndex) => {
+        /* COLLISION */
+        arrows.forEach((arrow,rIndex)=>{
             if(
                 arrow.x > ant.x &&
-                arrow.x < ant.x + 40 &&
+                arrow.x < ant.x+120 &&
                 arrow.y > ant.y &&
-                arrow.y < ant.y + 40
+                arrow.y < ant.y+120
             ){
                 ants.splice(aIndex,1);
                 arrows.splice(rIndex,1);
@@ -121,24 +160,25 @@ function update(){
 
     });
 
-    // Score
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    ctx.fillText("Score: " + score, 20, 30);
+    /* SCORE DISPLAY */
+    ctx.fillStyle="white";
+    ctx.font="30px Arial";
+    ctx.fillText("Score: "+score,20,40);
 
-    requestAnimationFrame(update);
+    requestAnimationFrame(gameLoop);
 }
 
-update();
+gameLoop();
 
-/* =======================
+/* =========================
    RESTART
-======================= */
+========================= */
 
 function restartGame(){
-    score = 0;
-    ants = [];
-    arrows = [];
-    gameOver = false;
-    document.getElementById("gameOver").style.display = "none";
+    score=0;
+    arrows=[];
+    ants=[];
+    antCount=1;
+    gameOver=false;
+    document.getElementById("gameOver").style.display="none";
 }
