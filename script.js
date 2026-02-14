@@ -4,21 +4,16 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let bowImg = new Image();
-bowImg.src = "bow.png";
-
-let arrowImg = new Image();
-arrowImg.src = "arrow.png";
-
-let antImg = new Image();
-antImg.src = "ant.png";
-
 let arrows = [];
-let ants = [];
+let balloons = [];
 let score = 0;
 let angle = 0;
 let gameOver = false;
 let charging = false;
+let chargePower = 0;
+
+let spawnInterval;
+let difficultyInterval;
 
 /* =========================
    GYROSCOPE AIM
@@ -40,12 +35,12 @@ if(navigator.getBattery){
         function updateCharging(){
             if(battery.charging){
                 charging = true;
-                console.log("Charging...");
             } else {
                 if(charging){
                     shootArrow();
                 }
                 charging = false;
+                chargePower = 0;
             }
         }
 
@@ -55,45 +50,172 @@ if(navigator.getBattery){
 }
 
 /* =========================
-   SHOOT FUNCTION
+   SHOOT
 ========================= */
 
 function shootArrow(){
-
-    if(gameOver) return;
+    if(gameOver || chargePower < 5) return;
 
     arrows.push({
         x: canvas.width/2,
-        y: canvas.height - 180,
-        angle: angle
+        y: canvas.height - 150,
+        angle: angle,
+        power: chargePower
+    });
+
+    chargePower = 0;
+}
+
+/* =========================
+   SPAWN BALLOONS (VERY FEW)
+========================= */
+
+let spawnRate = 3000;
+let balloonSpeed = 1;
+
+function spawnBalloon(){
+    balloons.push({
+        x: Math.random() * (canvas.width - 60) + 30,
+        y: -80
+    });
+}
+
+function startSpawning(){
+    spawnInterval = setInterval(spawnBalloon, spawnRate);
+}
+
+startSpawning();
+
+/* Increase difficulty gradually */
+difficultyInterval = setInterval(()=>{
+    balloonSpeed += 0.2;
+    if(spawnRate > 1000){
+        spawnRate -= 300;
+        clearInterval(spawnInterval);
+        startSpawning();
+    }
+}, 8000);
+
+/* =========================
+   DRAW BOW (ANIMATED)
+========================= */
+
+function drawBow(){
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height - 120);
+    ctx.rotate(angle*Math.PI/180);
+
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#8B4513";
+    ctx.beginPath();
+    ctx.moveTo(0, -100);
+    ctx.quadraticCurveTo(-60, 0, 0, 100);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, -100);
+    ctx.quadraticCurveTo(60, 0, 0, 100);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/* =========================
+   DRAW ARROW
+========================= */
+
+function drawArrow(arrow){
+    let rad = arrow.angle*Math.PI/180;
+
+    arrow.x += Math.sin(rad) * (5 + arrow.power/10);
+    arrow.y -= Math.cos(rad) * (5 + arrow.power/10);
+
+    ctx.save();
+    ctx.translate(arrow.x, arrow.y);
+    ctx.rotate(rad);
+
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 4;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 40);
+    ctx.lineTo(0, -40);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-10,-40);
+    ctx.lineTo(0,-60);
+    ctx.lineTo(10,-40);
+    ctx.fillStyle="white";
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/* =========================
+   DRAW BALLOON
+========================= */
+
+function drawBalloon(balloon){
+
+    balloon.y += balloonSpeed;
+
+    ctx.beginPath();
+    ctx.arc(balloon.x, balloon.y, 30, 0, Math.PI*2);
+    ctx.fillStyle = "red";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(balloon.x, balloon.y+30);
+    ctx.lineTo(balloon.x, balloon.y+60);
+    ctx.strokeStyle="white";
+    ctx.stroke();
+
+    if(balloon.y > canvas.height-20){
+        endGame();
+    }
+}
+
+/* =========================
+   COLLISION
+========================= */
+
+function checkCollision(){
+
+    arrows.forEach((arrow,aIndex)=>{
+        balloons.forEach((balloon,bIndex)=>{
+
+            let dx = arrow.x - balloon.x;
+            let dy = arrow.y - balloon.y;
+            let distance = Math.sqrt(dx*dx + dy*dy);
+
+            if(distance < 30){
+                balloons.splice(bIndex,1);
+                arrows.splice(aIndex,1);
+                score++;
+            }
+
+        });
     });
 }
 
 /* =========================
-   SPAWN ANTS SYSTEM
+   CHARGING INDICATOR
 ========================= */
 
-let spawnRate = 2000; // start slow
-let antCount = 1;
+function drawCharging(){
 
-function spawnAnts(){
-
-    for(let i=0;i<antCount;i++){
-        ants.push({
-            x: Math.random()*(canvas.width-120),
-            y: -120,
-            speed: 1 + score*0.05
-        });
+    if(charging){
+        chargePower += 0.5;
+        if(chargePower > 100) chargePower = 100;
     }
+
+    ctx.beginPath();
+    ctx.arc(canvas.width/2, canvas.height-120, 60, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(0,255,0,${chargePower/100})`;
+    ctx.lineWidth = 5;
+    ctx.stroke();
 }
-
-setInterval(spawnAnts, spawnRate);
-
-/* Increase difficulty */
-setInterval(()=>{
-    if(score > 5) antCount = 2;
-    if(score > 15) antCount = 3;
-}, 3000);
 
 /* =========================
    GAME LOOP
@@ -105,65 +227,25 @@ function gameLoop(){
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    /* DRAW BOW (BIG) */
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height-150);
-    ctx.rotate(angle*Math.PI/180);
-    ctx.drawImage(bowImg, -120, -200, 240, 400); // BIG SIZE
-    ctx.restore();
+    drawBow();
+    drawCharging();
 
-    /* DRAW ARROWS (BIG) */
     arrows.forEach((arrow,index)=>{
-
-        let rad = arrow.angle*Math.PI/180;
-
-        arrow.x += Math.sin(rad)*10;
-        arrow.y -= Math.cos(rad)*10;
-
-        ctx.save();
-        ctx.translate(arrow.x,arrow.y);
-        ctx.rotate(rad);
-        ctx.drawImage(arrowImg, -40,-120,80,240); // BIG ARROW
-        ctx.restore();
-
+        drawArrow(arrow);
         if(arrow.y < 0){
             arrows.splice(index,1);
         }
     });
 
-    /* DRAW ANTS (BIG) */
-    ants.forEach((ant,aIndex)=>{
-
-        ant.y += ant.speed;
-
-        ctx.drawImage(antImg, ant.x, ant.y, 120, 120); // BIG ANT
-
-        /* GAME OVER */
-        if(ant.y > canvas.height-120){
-            gameOver = true;
-            document.getElementById("gameOver").style.display="block";
-        }
-
-        /* COLLISION */
-        arrows.forEach((arrow,rIndex)=>{
-            if(
-                arrow.x > ant.x &&
-                arrow.x < ant.x+120 &&
-                arrow.y > ant.y &&
-                arrow.y < ant.y+120
-            ){
-                ants.splice(aIndex,1);
-                arrows.splice(rIndex,1);
-                score++;
-            }
-        });
-
+    balloons.forEach((balloon)=>{
+        drawBalloon(balloon);
     });
 
-    /* SCORE DISPLAY */
+    checkCollision();
+
     ctx.fillStyle="white";
-    ctx.font="30px Arial";
-    ctx.fillText("Score: "+score,20,40);
+    ctx.font="22px Arial";
+    ctx.fillText("Score: "+score,20,30);
 
     requestAnimationFrame(gameLoop);
 }
@@ -171,14 +253,44 @@ function gameLoop(){
 gameLoop();
 
 /* =========================
-   RESTART
+   GAME OVER
+========================= */
+
+function endGame(){
+    gameOver = true;
+    clearInterval(spawnInterval);
+    clearInterval(difficultyInterval);
+    document.getElementById("gameOver").style.display="block";
+}
+
+/* =========================
+   RESTART (FIXED)
 ========================= */
 
 function restartGame(){
-    score=0;
-    arrows=[];
-    ants=[];
-    antCount=1;
-    gameOver=false;
+    score = 0;
+    arrows = [];
+    balloons = [];
+    balloonSpeed = 1;
+    spawnRate = 3000;
+    chargePower = 0;
+    gameOver = false;
+
     document.getElementById("gameOver").style.display="none";
+
+    clearInterval(spawnInterval);
+    clearInterval(difficultyInterval);
+
+    startSpawning();
+
+    difficultyInterval = setInterval(()=>{
+        balloonSpeed += 0.2;
+        if(spawnRate > 1000){
+            spawnRate -= 300;
+            clearInterval(spawnInterval);
+            startSpawning();
+        }
+    }, 8000);
+
+    gameLoop();
 }
